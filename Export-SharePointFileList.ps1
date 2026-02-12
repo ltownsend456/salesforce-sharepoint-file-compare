@@ -23,9 +23,11 @@ param(
     [switch]$Recurse
 )
 
-# Ensure PnP is available
+# Ensure PnP is available (install once: Install-Module -Name PnP.PowerShell -Scope CurrentUser)
 if (-not (Get-Module -ListAvailable -Name PnP.PowerShell)) {
-    Write-Error "PnP.PowerShell is required. Install with: Install-Module -Name PnP.PowerShell -Scope CurrentUser"
+    Write-Host "PnP.PowerShell is not installed. Run this command first (if prompted about PSGallery, choose [A] Yes to All):" -ForegroundColor Yellow
+    Write-Host "  Install-Module -Name PnP.PowerShell -Scope CurrentUser" -ForegroundColor Cyan
+    Write-Error "PnP.PowerShell is required. Install it, then run this script again."
     exit 1
 }
 
