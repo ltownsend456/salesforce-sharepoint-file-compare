@@ -114,20 +114,23 @@ catch {
 
 Write-Host "Retrieving files from library '$LibraryName' (this may take a while for large libraries)..." -ForegroundColor Cyan
 
-# Get all items; filter to files (have FileLeafRef and not a folder)
-$query = "<View Scope='RecursiveAll'><Query><Where><Eq><FieldRef Name='FSObjType'/><Value Type='Integer'>0</Value></Eq></Where></Query></View>"
-$items = Get-PnPListItem -List $LibraryName -Query $query -PageSize 500
+# Get ALL items with pagination (no server-side CAML filter; avoids 5000 item threshold).
+# Filter to files (not folders) client-side.
+$items = Get-PnPListItem -List $LibraryName -PageSize 500 -Fields "FileLeafRef","FileRef","File_x0020_Size","Created","Modified","Author","Editor","FSObjType"
 
-$results = @()
+$results = [System.Collections.ArrayList]::new()
+$count = 0
 foreach ($item in $items) {
-    $fileRef = $item["FileRef"]
+    # Skip folders (FSObjType = 1)
+    if ($item["FSObjType"] -eq 1) { continue }
     $fileName = $item["FileLeafRef"]
     if (-not $fileName) { continue }
+    $fileRef = $item["FileRef"]
     $authorVal = $item["Author"]
     $editorVal = $item["Editor"]
     $authorStr = if ($null -ne $authorVal -and $authorVal.LookupValue) { $authorVal.LookupValue } else { "" }
     $editorStr = if ($null -ne $editorVal -and $editorVal.LookupValue) { $editorVal.LookupValue } else { "" }
-    $results += [PSCustomObject]@{
+    $null = $results.Add([PSCustomObject]@{
         Name              = $fileName
         FileRef           = $fileRef
         FileExtension     = [System.IO.Path]::GetExtension($fileName)
@@ -136,7 +139,9 @@ foreach ($item in $items) {
         TimeLastModified  = $item["Modified"]
         Author            = $authorStr
         Editor            = $editorStr
-    }
+    })
+    $count++
+    if ($count % 500 -eq 0) { Write-Host "  Retrieved $count files so far..." -ForegroundColor Gray }
 }
 
 Disconnect-PnPOnline
