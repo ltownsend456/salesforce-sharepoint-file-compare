@@ -24,7 +24,22 @@ param(
 )
 
 # Ensure PnP is available. On PS 5.1 we use SharePointPnPPowerShellOnline; on PS 7+ we use PnP.PowerShell.
-$pnpModules = if ($PSVersionTable.PSVersion.Major -lt 7) {
+function Import-PnPModuleIfAvailable {
+    param([string]$modName, [ref]$lastError)
+    if (Get-Module -Name $modName) { return $true }
+    $avail = Get-Module -ListAvailable -Name $modName | Select-Object -First 1
+    if (-not $avail) { return $false }
+    try {
+        Import-Module -Name $modName -Force -ErrorAction Stop
+        return $true
+    }
+    catch {
+        $lastError.Value = $_
+        return $false
+    }
+}
+
+$pnpModuleList = if ($PSVersionTable.PSVersion.Major -lt 7) {
     @("SharePointPnPPowerShellOnline", "PnP.PowerShell")
 } else {
     @("PnP.PowerShell", "SharePointPnPPowerShellOnline")
@@ -32,38 +47,37 @@ $pnpModules = if ($PSVersionTable.PSVersion.Major -lt 7) {
 $pnpLoaded = $false
 $lastLoadError = $null
 
-foreach ($modName in $pnpModules) {
-    if (Get-Module -Name $modName) { $pnpLoaded = $true; break }
-    $avail = Get-Module -ListAvailable -Name $modName | Select-Object -First 1
-    if ($avail) {
-        try {
-            Import-Module -Name $modName -Force -ErrorAction Stop
-            $pnpLoaded = $true
-            break
-        } catch {
-            $lastLoadError = $_
-        }
+foreach ($modName in $pnpModuleList) {
+    if (Import-PnPModuleIfAvailable -modName $modName -lastError ([ref]$lastLoadError)) {
+        $pnpLoaded = $true
+        break
     }
 }
 
 if (-not $pnpLoaded) {
-    # Try loading from PSModulePath (e.g. OneDrive path) for PnP.PowerShell; on PS 5.1 use legacy module
     $modulePaths = $env:PSModulePath -split ';'
     foreach ($base in $modulePaths) {
-        foreach ($modName in $pnpModules) {
-            $p = Join-Path $base $modName
-            if (Test-Path $p) {
+        foreach ($modName in $pnpModuleList) {
+            $modulePath = Join-Path $base $modName
+            if (Test-Path $modulePath) {
+                $loaded = $false
                 try {
                     $env:PSModulePath = "$base;$env:PSModulePath"
                     Import-Module -Name $modName -Force -ErrorAction Stop
+                    $loaded = $true
+                }
+                catch {
+                    $lastLoadError = $_
+                }
+                if ($loaded) {
                     $pnpLoaded = $true
                     break
-                } catch {
-                    $lastLoadError = $_
                 }
             }
         }
-        if ($pnpLoaded) { break }
+        if ($pnpLoaded) {
+            break
+        }
     }
 }
 
@@ -90,7 +104,7 @@ Write-Host "Connecting to SharePoint: $SiteUrl" -ForegroundColor Cyan
 Connect-PnPOnline @connectParams
 
 try {
-    $list = Get-PnPList -Identity $LibraryName -ErrorAction Stop
+    $null = Get-PnPList -Identity $LibraryName -ErrorAction Stop
 }
 catch {
     Write-Host "List '$LibraryName' not found. Available lists:" -ForegroundColor Yellow
