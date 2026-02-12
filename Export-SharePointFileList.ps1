@@ -28,12 +28,25 @@ $pnp = Get-Module -ListAvailable -Name PnP.PowerShell | Select-Object -First 1
 if (-not $pnp) {
     # Documents may be OneDrive-redirected; check every path in PSModulePath for PnP.PowerShell
     $modulePaths = $env:PSModulePath -split ';'
+    $lastLoadError = $null
     foreach ($base in $modulePaths) {
         $p = Join-Path $base "PnP.PowerShell"
         if (Test-Path $p) {
-            Import-Module $p -Force -ErrorAction SilentlyContinue
+            $lastLoadError = $null
+            try {
+                # Prepend this path so PowerShell resolves the module by name (avoids path/encoding issues)
+                $env:PSModulePath = "$base;$env:PSModulePath"
+                Import-Module -Name PnP.PowerShell -Force -ErrorAction Stop
+            } catch {
+                $lastLoadError = $_
+            }
             if (Get-Module -Name PnP.PowerShell) { break }
         }
+    }
+    if (-not (Get-Module -Name PnP.PowerShell) -and $lastLoadError) {
+        Write-Host "PnP folder exists but Import-Module failed:" -ForegroundColor Yellow
+        Write-Host $lastLoadError.Exception.Message -ForegroundColor Red
+        if ($lastLoadError.Exception.InnerException) { Write-Host $lastLoadError.Exception.InnerException.Message -ForegroundColor Red }
     }
 }
 if (-not (Get-Module -Name PnP.PowerShell)) {
