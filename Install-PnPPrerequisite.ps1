@@ -31,11 +31,27 @@ try {
 
 Write-Host "Step 3: Verifying..." -ForegroundColor Cyan
 $mod = Get-Module -ListAvailable -Name PnP.PowerShell
+if (-not $mod) {
+    # On VDIs the module path may not refresh; try loading from known CurrentUser paths
+    $paths = @(
+        (Join-Path $HOME "Documents\WindowsPowerShell\Modules\PnP.PowerShell"),
+        (Join-Path $HOME "Documents\PowerShell\Modules\PnP.PowerShell")
+    )
+    foreach ($p in $paths) {
+        if (Test-Path $p) {
+            Write-Host "Found module at: $p" -ForegroundColor Gray
+            Import-Module $p -Force -ErrorAction SilentlyContinue
+            $mod = Get-Module -Name PnP.PowerShell
+            if ($mod) { break }
+        }
+    }
+}
 if ($mod) {
-    Write-Host "SUCCESS. PnP.PowerShell is installed (Version $($mod.Version))." -ForegroundColor Green
-    Write-Host "You can now run: .\Export-SharePointFileList.ps1 -SiteUrl '...' -LibraryName 'Shared Documents' -OutputPath '.\SharePoint_FileList.csv'" -ForegroundColor Green
+    Write-Host "SUCCESS. PnP.PowerShell is available (Version $($mod.Version))." -ForegroundColor Green
+    Write-Host "Run the export script in THIS SAME terminal: .\Export-SharePointFileList.ps1 -SiteUrl '...' -LibraryName 'Shared Documents' -OutputPath '.\SharePoint_FileList.csv'" -ForegroundColor Green
 } else {
-    Write-Host "Module not found after install. Try closing this terminal, opening a new PowerShell window, and run: Get-Module -ListAvailable PnP.PowerShell" -ForegroundColor Yellow
-    Write-Host "If it still doesn't appear, the install failed (see any error from Step 2 above)." -ForegroundColor Red
+    Write-Host "Module not found. Checking where PowerShell looks for modules..." -ForegroundColor Yellow
+    Write-Host "PSModulePath: $($env:PSModulePath -replace ';', \"`n  \")" -ForegroundColor Gray
+    Write-Host "If your Documents folder is redirected (e.g. OneDrive), install may have gone there. Run the export script anyway - it will try to load PnP from known paths." -ForegroundColor Yellow
     exit 1
 }

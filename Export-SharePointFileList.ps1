@@ -23,10 +23,23 @@ param(
     [switch]$Recurse
 )
 
-# Ensure PnP is available (install once: Install-Module -Name PnP.PowerShell -Scope CurrentUser)
-if (-not (Get-Module -ListAvailable -Name PnP.PowerShell)) {
-    Write-Host "PnP.PowerShell is not installed. Run this command first (if prompted about PSGallery, choose [A] Yes to All):" -ForegroundColor Yellow
-    Write-Host "  Install-Module -Name PnP.PowerShell -Scope CurrentUser" -ForegroundColor Cyan
+# Ensure PnP is available (install once: .\Install-PnPPrerequisite.ps1 or Install-Module -Name PnP.PowerShell -Scope CurrentUser)
+$pnp = Get-Module -ListAvailable -Name PnP.PowerShell | Select-Object -First 1
+if (-not $pnp) {
+    # On VDIs the module path may not show the module; try loading from known CurrentUser paths
+    $paths = @(
+        (Join-Path $env:USERPROFILE "Documents\WindowsPowerShell\Modules\PnP.PowerShell"),
+        (Join-Path $env:USERPROFILE "Documents\PowerShell\Modules\PnP.PowerShell")
+    )
+    foreach ($p in $paths) {
+        if (Test-Path $p) {
+            Import-Module $p -Force -ErrorAction SilentlyContinue
+            if (Get-Module -Name PnP.PowerShell) { break }
+        }
+    }
+}
+if (-not (Get-Module -Name PnP.PowerShell)) {
+    Write-Host "PnP.PowerShell is not installed or not loadable. Run: .\Install-PnPPrerequisite.ps1" -ForegroundColor Yellow
     Write-Error "PnP.PowerShell is required. Install it, then run this script again."
     exit 1
 }
