@@ -26,7 +26,7 @@ cd "C:\Users\laine\.cursor\salesforce-mcp"
 
 .\Export-SharePointFileList.ps1 `
   -SiteUrl "https://YOUR-TENANT.sharepoint.com/sites/YOUR-SITE" `
-  -LibraryName "Documents" `
+  -LibraryName "Shared Documents" `
   -OutputPath ".\SharePoint_FileList.csv"
 ```
 
@@ -34,7 +34,15 @@ cd "C:\Users\laine\.cursor\salesforce-mcp"
 - **LibraryName**: Document library name (e.g. `Documents`, `Shared Documents`, or the exact name).
 - A browser sign-in may appear for `-Interactive` auth.
 
-This creates `SharePoint_FileList.csv` with columns such as: Name, FileRef, FileExtension, Length, TimeCreated, TimeLastModified, Author, Editor.
+**Apples-to-apples with Salesforce CIM list:** If your library has a **Document Type** column (e.g. CIM, CIP) and your Salesforce export is CIM-only, export only CIMs from SharePoint so the comparison isn’t 16k vs 2k:
+
+```powershell
+.\Export-SharePointFileList.ps1 -SiteUrl "..." -LibraryName "Shared Documents" -OutputPath ".\SharePoint_FileList.csv" -DocumentTypeFilter "CIM"
+```
+
+Then replace the existing CSV and re-run the Python comparison. If the column has a different internal name, the script tries `Document_x0020_Type` and `DocumentType`; you can discover the internal name with `Get-PnPField -List "Shared Documents"` on the site.
+
+This creates `SharePoint_FileList.csv` with columns: Name, FileRef, FileExtension, Length, TimeCreated, TimeLastModified, Author, Editor.
 
 ## Step 2: Run the comparison
 

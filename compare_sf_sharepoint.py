@@ -54,11 +54,18 @@ def load_sharepoint_csv(path: str) -> tuple[list[dict], set[str], dict[str, list
     rows = []
     names = set()
     by_name = defaultdict(list)
-    with open(path, newline="", encoding="utf-8", errors="replace") as f:
+    # utf-8-sig strips BOM if present (Excel/Export often add it)
+    with open(path, newline="", encoding="utf-8-sig", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # Accept "Name" or "FileLeafRef" or "Title"
-            name = row.get(SP_FILE_COLUMN) or row.get("FileLeafRef") or row.get("Title", "")
+            # Accept "Name" or "FileLeafRef" or "Title" (keys may have BOM prefix)
+            name = (
+                row.get(SP_FILE_COLUMN)
+                or row.get("FileLeafRef")
+                or row.get("Title")
+                or row.get("\ufeffName")
+                or ""
+            )
             if not name or not str(name).strip():
                 continue
             name = str(name).strip()

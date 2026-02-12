@@ -20,7 +20,10 @@ param(
     [string]$OutputPath = ".\SharePoint_FileList.csv",
 
     [Parameter(HelpMessage = "Include files in subfolders")]
-    [switch]$Recurse
+    [switch]$Recurse,
+
+    [Parameter(HelpMessage = "Only export items where Document Type equals this value (e.g. 'CIM' for apples-to-apples with Salesforce CIM list). Omit to export all files.")]
+    [string]$DocumentTypeFilter = ""
 )
 
 # Ensure PnP is available. On PS 5.1 we use SharePointPnPPowerShellOnline; on PS 7+ we use PnP.PowerShell.
@@ -112,17 +115,34 @@ catch {
     exit 1
 }
 
+if ($DocumentTypeFilter) {
+    Write-Host "Document Type filter: only items where Document Type = '$DocumentTypeFilter'" -ForegroundColor Cyan
+}
 Write-Host "Retrieving files from library '$LibraryName' (this may take a while for large libraries)..." -ForegroundColor Cyan
 
-# Get ALL items with pagination (no server-side CAML filter; avoids 5000 item threshold).
-# Filter to files (not folders) client-side.
-$items = Get-PnPListItem -List $LibraryName -PageSize 500 -Fields "FileLeafRef","FileRef","File_x0020_Size","Created","Modified","Author","Editor","FSObjType"
+# Request Document Type if filtering (internal name often Document_x0020_Type or DocumentType)
+$fields = "FileLeafRef","FileRef","File_x0020_Size","Created","Modified","Author","Editor","FSObjType"
+if ($DocumentTypeFilter) {
+    $fields = $fields + @("Document_x0020_Type","DocumentType")
+}
+$items = Get-PnPListItem -List $LibraryName -PageSize 500 -Fields $fields
 
 $results = [System.Collections.ArrayList]::new()
 $count = 0
+$skippedType = 0
 foreach ($item in $items) {
     # Skip folders (FSObjType = 1)
     if ($item["FSObjType"] -eq 1) { continue }
+    # Optional: only CIM (or specified type) for apples-to-apples with Salesforce
+    if ($DocumentTypeFilter) {
+        $docType = if ($null -ne $item["Document_x0020_Type"]) { $item["Document_x0020_Type"] } else { $item["DocumentType"] }
+        if ($null -eq $docType) { $skippedType++; continue }
+        $docTypeStr = if ($docType -is [string]) { $docType.Trim() } elseif ($docType.LookupValue) { $docType.LookupValue } else { [string]$docType }
+        if ($docTypeStr -ne $DocumentTypeFilter) {
+            $skippedType++
+            continue
+        }
+    }
     $fileName = $item["FileLeafRef"]
     if (-not $fileName) { continue }
     $fileRef = $item["FileRef"]
@@ -130,7 +150,7 @@ foreach ($item in $items) {
     $editorVal = $item["Editor"]
     $authorStr = if ($null -ne $authorVal -and $authorVal.LookupValue) { $authorVal.LookupValue } else { "" }
     $editorStr = if ($null -ne $editorVal -and $editorVal.LookupValue) { $editorVal.LookupValue } else { "" }
-    $null = $results.Add([PSCustomObject]@{
+    $o = [PSCustomObject]@{
         Name              = $fileName
         FileRef           = $fileRef
         FileExtension     = [System.IO.Path]::GetExtension($fileName)
@@ -139,9 +159,14 @@ foreach ($item in $items) {
         TimeLastModified  = $item["Modified"]
         Author            = $authorStr
         Editor            = $editorStr
-    })
+    }
+    if ($DocumentTypeFilter) { $o | Add-Member -NotePropertyName "DocumentType" -NotePropertyValue $DocumentTypeFilter }
+    $null = $results.Add($o)
     $count++
-    if ($count % 500 -eq 0) { Write-Host "  Retrieved $count files so far..." -ForegroundColor Gray }
+    if ($count % 500 -eq 0) { Write-Host "  Retrieved $count matching files so far..." -ForegroundColor Gray }
+}
+if ($DocumentTypeFilter -and $skippedType -gt 0) {
+    Write-Host "  Skipped $skippedType items that did not have Document Type = '$DocumentTypeFilter'" -ForegroundColor Gray
 }
 
 Disconnect-PnPOnline
