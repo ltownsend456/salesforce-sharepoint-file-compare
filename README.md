@@ -11,11 +11,10 @@ Automate comparing files between **Salesforce** (CSV export) and **SharePoint** 
 ## Prerequisites
 
 1. **Python 3.9+** (no extra packages; uses only the standard library).
-2. **PnP PowerShell** (for exporting the SharePoint file list). Run this **once** in PowerShell before using the export script:
-   ```powershell
-   Install-Module -Name PnP.PowerShell -Scope CurrentUser
-   ```
-   Or run the helper script once: **`.\Install-PnPPrerequisite.ps1`** — it trusts PSGallery and installs PnP so you don't have to answer prompts. If you install manually and see *"Untrusted repository..."* choose **`A`** (Yes to All).
+2. **PnP PowerShell** (for exporting the SharePoint file list). Run **`.\Install-PnPPrerequisite.ps1`** once:
+   - On **Windows PowerShell 5.1** (e.g. VDI), it installs the legacy **SharePointPnPPowerShellOnline** module (works with 5.1).
+   - On **PowerShell 7+**, it installs **PnP.PowerShell**.  
+   The script trusts PSGallery and picks the right module for your version.
    [Microsoft: PnP PowerShell](https://learn.microsoft.com/sharepoint/dev/solution-guidance/pnp-provisioning-engine-and-the-core-library)
 
 ## Step 1: Export SharePoint file list to CSV

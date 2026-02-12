@@ -36,6 +36,16 @@
 - PowerShell uses `Get-PnPListItem` with `Scope='RecursiveAll'` and `FSObjType=0` to get all files (including subfolders).
 - Salesforce CSV path used in examples: `C:\Users\laine\OneDrive\Downloads\sfdc_2025_uspe_cims.csv`.
 
+## PowerShell version
+
+- **PnP.PowerShell 3.x** requires **PowerShell 7.4.6+**. On **Windows PowerShell 5.1** (common on VDIs) it will not load.
+- **Install-PnPPrerequisite.ps1** detects PS version: on 5.1 it installs **SharePointPnPPowerShellOnline** (legacy); on 7+ it installs PnP.PowerShell.
+- **Export-SharePointFileList.ps1** tries the legacy module first on 5.1, then PnP.PowerShell. Connect-PnPOnline uses -UseWebLogin (legacy) or -Interactive (modern).
+
+## VDI / OneDrive
+
+- On VDIs, Documents is often **OneDrive-redirected** (e.g. `C:\Users\...\OneDrive - HIG.net\Documents\...`). Install-Module -Scope CurrentUser installs to the first writable path in PSModulePath (the OneDrive path). Scripts must look for PnP in **every** path in $env:PSModulePath, not only $HOME\Documents\..., so Export and Install now iterate PSModulePath.
+
 ## What NOT to use for the SharePoint file list
 
 - **SharePoint CIM/CIP MCP search**: Do not use for generating the full file list. It only returns a limited, search-ranked subset of files, is slow for bulk inventory, and is not reliable for complete SF vs SP comparison. Use the PnP PowerShell export on the user's VDI instead.

@@ -23,40 +23,71 @@ param(
     [switch]$Recurse
 )
 
-# Ensure PnP is available (install once: .\Install-PnPPrerequisite.ps1 or Install-Module -Name PnP.PowerShell -Scope CurrentUser)
-$pnp = Get-Module -ListAvailable -Name PnP.PowerShell | Select-Object -First 1
-if (-not $pnp) {
-    # Documents may be OneDrive-redirected; check every path in PSModulePath for PnP.PowerShell
-    $modulePaths = $env:PSModulePath -split ';'
-    $lastLoadError = $null
-    foreach ($base in $modulePaths) {
-        $p = Join-Path $base "PnP.PowerShell"
-        if (Test-Path $p) {
-            $lastLoadError = $null
-            try {
-                # Prepend this path so PowerShell resolves the module by name (avoids path/encoding issues)
-                $env:PSModulePath = "$base;$env:PSModulePath"
-                Import-Module -Name PnP.PowerShell -Force -ErrorAction Stop
-            } catch {
-                $lastLoadError = $_
-            }
-            if (Get-Module -Name PnP.PowerShell) { break }
+# Ensure PnP is available. On PS 5.1 we use SharePointPnPPowerShellOnline; on PS 7+ we use PnP.PowerShell.
+$pnpModules = if ($PSVersionTable.PSVersion.Major -lt 7) {
+    @("SharePointPnPPowerShellOnline", "PnP.PowerShell")
+} else {
+    @("PnP.PowerShell", "SharePointPnPPowerShellOnline")
+}
+$pnpLoaded = $false
+$lastLoadError = $null
+
+foreach ($modName in $pnpModules) {
+    if (Get-Module -Name $modName) { $pnpLoaded = $true; break }
+    $avail = Get-Module -ListAvailable -Name $modName | Select-Object -First 1
+    if ($avail) {
+        try {
+            Import-Module -Name $modName -Force -ErrorAction Stop
+            $pnpLoaded = $true
+            break
+        } catch {
+            $lastLoadError = $_
         }
     }
-    if (-not (Get-Module -Name PnP.PowerShell) -and $lastLoadError) {
-        Write-Host "PnP folder exists but Import-Module failed:" -ForegroundColor Yellow
-        Write-Host $lastLoadError.Exception.Message -ForegroundColor Red
-        if ($lastLoadError.Exception.InnerException) { Write-Host $lastLoadError.Exception.InnerException.Message -ForegroundColor Red }
+}
+
+if (-not $pnpLoaded) {
+    # Try loading from PSModulePath (e.g. OneDrive path) for PnP.PowerShell; on PS 5.1 use legacy module
+    $modulePaths = $env:PSModulePath -split ';'
+    foreach ($base in $modulePaths) {
+        foreach ($modName in $pnpModules) {
+            $p = Join-Path $base $modName
+            if (Test-Path $p) {
+                try {
+                    $env:PSModulePath = "$base;$env:PSModulePath"
+                    Import-Module -Name $modName -Force -ErrorAction Stop
+                    $pnpLoaded = $true
+                    break
+                } catch {
+                    $lastLoadError = $_
+                }
+            }
+        }
+        if ($pnpLoaded) { break }
     }
 }
-if (-not (Get-Module -Name PnP.PowerShell)) {
-    Write-Host "PnP.PowerShell is not installed or not loadable. Run: .\Install-PnPPrerequisite.ps1" -ForegroundColor Yellow
-    Write-Error "PnP.PowerShell is required. Install it, then run this script again."
+
+if (-not $pnpLoaded) {
+    if ($lastLoadError -and $PSVersionTable.PSVersion.Major -lt 7) {
+        Write-Host "On Windows PowerShell 5.1, PnP.PowerShell 3.x requires PowerShell 7.4.6+." -ForegroundColor Yellow
+        Write-Host "Run .\Install-PnPPrerequisite.ps1 to install the legacy module (SharePointPnPPowerShellOnline) for 5.1." -ForegroundColor Yellow
+    }
+    if ($lastLoadError) {
+        Write-Host "Load error: $($lastLoadError.Exception.Message)" -ForegroundColor Red
+    }
+    Write-Error "PnP module is required. Run: .\Install-PnPPrerequisite.ps1"
     exit 1
 }
 
+# Legacy module (PS 5.1) uses -UseWebLogin; modern PnP uses -Interactive
+$connectParams = @{ Url = $SiteUrl }
+$cmd = Get-Command Connect-PnPOnline -ErrorAction SilentlyContinue
+if ($cmd.Parameters['Interactive']) { $connectParams['Interactive'] = $true }
+elseif ($cmd.Parameters['UseWebLogin']) { $connectParams['UseWebLogin'] = $true }
+else { $connectParams['Interactive'] = $true }
+
 Write-Host "Connecting to SharePoint: $SiteUrl" -ForegroundColor Cyan
-Connect-PnPOnline -Url $SiteUrl -Interactive
+Connect-PnPOnline @connectParams
 
 try {
     $list = Get-PnPList -Identity $LibraryName -ErrorAction Stop
