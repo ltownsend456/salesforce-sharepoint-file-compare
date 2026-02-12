@@ -3,14 +3,12 @@
     Shows where PowerShell looks for modules and whether PnP.PowerShell exists in those paths.
 #>
 Write-Host "PSModulePath (where PowerShell looks for modules):" -ForegroundColor Cyan
-$env:PSModulePath -split ';' | ForEach-Object { Write-Host "  $_" }
+$bases = $env:PSModulePath -split ';'
+$bases | ForEach-Object { Write-Host "  $_" }
 Write-Host ""
-Write-Host "Checking known CurrentUser paths for PnP.PowerShell:" -ForegroundColor Cyan
-$paths = @(
-    (Join-Path $env:USERPROFILE "Documents\WindowsPowerShell\Modules\PnP.PowerShell"),
-    (Join-Path $env:USERPROFILE "Documents\PowerShell\Modules\PnP.PowerShell")
-)
-foreach ($p in $paths) {
+Write-Host "Checking each path for PnP.PowerShell:" -ForegroundColor Cyan
+foreach ($base in $bases) {
+    $p = Join-Path $base "PnP.PowerShell"
     $exists = Test-Path $p
     Write-Host "  $p : $(if ($exists) { 'FOUND' } else { 'not found' })" -ForegroundColor $(if ($exists) { 'Green' } else { 'Gray' })
 }

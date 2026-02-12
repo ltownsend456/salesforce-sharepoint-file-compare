@@ -32,12 +32,10 @@ try {
 Write-Host "Step 3: Verifying..." -ForegroundColor Cyan
 $mod = Get-Module -ListAvailable -Name PnP.PowerShell
 if (-not $mod) {
-    # On VDIs the module path may not refresh; try loading from known CurrentUser paths
-    $paths = @(
-        (Join-Path $HOME "Documents\WindowsPowerShell\Modules\PnP.PowerShell"),
-        (Join-Path $HOME "Documents\PowerShell\Modules\PnP.PowerShell")
-    )
-    foreach ($p in $paths) {
+    # Documents may be OneDrive-redirected; check every path in PSModulePath
+    $modulePaths = $env:PSModulePath -split ';'
+    foreach ($base in $modulePaths) {
+        $p = Join-Path $base "PnP.PowerShell"
         if (Test-Path $p) {
             Write-Host "Found module at: $p" -ForegroundColor Gray
             Import-Module $p -Force -ErrorAction SilentlyContinue

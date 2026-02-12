@@ -26,12 +26,10 @@ param(
 # Ensure PnP is available (install once: .\Install-PnPPrerequisite.ps1 or Install-Module -Name PnP.PowerShell -Scope CurrentUser)
 $pnp = Get-Module -ListAvailable -Name PnP.PowerShell | Select-Object -First 1
 if (-not $pnp) {
-    # On VDIs the module path may not show the module; try loading from known CurrentUser paths
-    $paths = @(
-        (Join-Path $env:USERPROFILE "Documents\WindowsPowerShell\Modules\PnP.PowerShell"),
-        (Join-Path $env:USERPROFILE "Documents\PowerShell\Modules\PnP.PowerShell")
-    )
-    foreach ($p in $paths) {
+    # Documents may be OneDrive-redirected; check every path in PSModulePath for PnP.PowerShell
+    $modulePaths = $env:PSModulePath -split ';'
+    foreach ($base in $modulePaths) {
+        $p = Join-Path $base "PnP.PowerShell"
         if (Test-Path $p) {
             Import-Module $p -Force -ErrorAction SilentlyContinue
             if (Get-Module -Name PnP.PowerShell) { break }
