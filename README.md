@@ -82,6 +82,9 @@ Expected column: **Name** (or FileLeafRef / Title). The PowerShell script writes
 
 ## Troubleshooting
 
+- **PnP install fails or "Install may have failed"**  
+  Pull the latest repo and run `.\Install-PnPPrerequisite.ps1` again (it now forces TLS 1.2 and shows the real error). If you see a network/proxy error, your VDI may block PowerShell Gallery. After a successful install, close the terminal and open a new one before running the export script.
+
 - **“List 'Documents' not found”**  
   Run the script without `-LibraryName` to see available lists, or use the exact library name (e.g. the CIM/CIP library name).
 
