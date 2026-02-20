@@ -13,6 +13,18 @@ venv/
 .env
 .env.local
 
+# Uncommitted / local-only
+Install-PnPPrerequisite.ps1
+Diagnose-PnPPath.ps1
+Export-SharePointFileList.ps1
+MEMORY.md
+VERIFICATION.md
+compare_salesforce_to_sharepoint.py
+compare_sf_sharepoint.py
+narrow_only_in_sharepoint.py
+narrow_v2.py
+verify_comparison_results.py
+
 # OS
 .DS_Store
 Thumbs.db
